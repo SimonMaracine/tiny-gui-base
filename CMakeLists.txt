@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
+option(GUI_BASE_INCLUDE_FILE_DIALOG "Wether to include ImGuiFileDialog or not" OFF)
+
 project("tiny-gui-base" LANGUAGES C CXX)
 
 add_library(imgui STATIC
@@ -25,4 +27,11 @@ target_include_directories(glad PUBLIC "extern/glad/include")
 
 add_subdirectory(extern/glfw)
 
+if(GUI_BASE_INCLUDE_FILE_DIALOG)
+    add_subdirectory(extern/ImGuiFileDialog)
+    target_include_directories(ImGuiFileDialog PRIVATE "extern/imgui")
+endif()
+
 add_subdirectory(gui_base)
+
+message(STATUS "gui_base: Including file dialog: ${GUI_BASE_INCLUDE_FILE_DIALOG}")

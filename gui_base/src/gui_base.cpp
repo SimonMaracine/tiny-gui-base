@@ -29,7 +29,7 @@ namespace gui_base {
     }
 
     void GuiApplication::quit() {
-        glfwSetWindowShouldClose(window, 1);
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
 
     void GuiApplication::loop() {
@@ -45,10 +45,13 @@ namespace gui_base {
             update();
 
             ImGui::Render();
+
             int display_w, display_h;
             glfwGetFramebufferSize(window, &display_w, &display_h);
+
             glViewport(0, 0, display_w, display_h);
             glClear(GL_COLOR_BUFFER_BIT);
+
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
             glfwSwapBuffers(window);

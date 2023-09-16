@@ -9,6 +9,10 @@ target_link_libraries(gui_base PRIVATE glfw)
 target_link_libraries(gui_base PUBLIC imgui)
 target_link_libraries(gui_base PUBLIC glad)
 
+if(GUI_BASE_INCLUDE_FILE_DIALOG)
+    target_link_libraries(gui_base PUBLIC ImGuiFileDialog)
+endif()
+
 target_include_directories(gui_base PUBLIC "include")
 
 target_compile_features(gui_base PRIVATE cxx_std_17)
