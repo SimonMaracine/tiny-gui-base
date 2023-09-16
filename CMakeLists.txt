@@ -4,7 +4,7 @@ option(GUI_BASE_INCLUDE_FILE_DIALOG "Wether to include ImGuiFileDialog or not" O
 
 project("tiny-gui-base" LANGUAGES C CXX)
 
-add_library(imgui STATIC
+add_library(dear_imgui STATIC
     "extern/imgui/imgui.h"
     "extern/imgui/imgui.cpp"
     "extern/imgui/imgui_widgets.cpp"
@@ -19,8 +19,8 @@ add_library(imgui STATIC
     "extern/imgui/backends/imgui_impl_opengl3.cpp"
 )
 
-target_include_directories(imgui PUBLIC "extern/imgui")
-target_include_directories(imgui PRIVATE "extern/glfw/include")
+target_include_directories(dear_imgui PUBLIC "extern/imgui")
+target_include_directories(dear_imgui PRIVATE "extern/glfw/include")
 
 add_library(glad STATIC "extern/glad/src/glad.c")
 target_include_directories(glad PUBLIC "extern/glad/include")
@@ -33,5 +33,7 @@ if(GUI_BASE_INCLUDE_FILE_DIALOG)
 endif()
 
 add_subdirectory(gui_base)
+
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 message(STATUS "gui_base: Including file dialog: ${GUI_BASE_INCLUDE_FILE_DIALOG}")

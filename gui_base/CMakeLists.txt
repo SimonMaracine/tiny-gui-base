@@ -6,7 +6,7 @@ add_library(gui_base STATIC
 )
 
 target_link_libraries(gui_base PRIVATE glfw)
-target_link_libraries(gui_base PUBLIC imgui)
+target_link_libraries(gui_base PUBLIC dear_imgui)
 target_link_libraries(gui_base PUBLIC glad)
 
 if(GUI_BASE_INCLUDE_FILE_DIALOG)
