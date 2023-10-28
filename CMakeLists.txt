@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-option(GUI_BASE_INCLUDE_FILE_DIALOG "Wether to include ImGuiFileDialog or not" OFF)
+option(GUI_BASE_INCLUDE_FILE_DIALOG "Whether to include ImGuiFileDialog or not" OFF)
 
 project("tiny-gui-base" LANGUAGES C CXX)
 
