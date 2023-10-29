@@ -13,6 +13,10 @@ if(GUI_BASE_INCLUDE_FILE_DIALOG)
     target_link_libraries(gui_base PUBLIC ImGuiFileDialog)
 endif()
 
+if(GUI_BASE_INCLUDE_PLOTTING)
+    target_link_libraries(gui_base PUBLIC implot)
+endif()
+
 target_include_directories(gui_base PUBLIC "include")
 
 target_compile_features(gui_base PRIVATE cxx_std_17)

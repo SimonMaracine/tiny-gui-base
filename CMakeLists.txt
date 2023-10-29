@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
 
 option(GUI_BASE_INCLUDE_FILE_DIALOG "Wether to include ImGuiFileDialog or not" OFF)
+option(GUI_BASE_INCLUDE_PLOTTING "Whether to include implot or not" OFF)
 
 project("tiny-gui-base" LANGUAGES C CXX)
 
+# Dear ImGui
 add_library(dear_imgui STATIC
     "extern/imgui/imgui.h"
     "extern/imgui/imgui.cpp"
@@ -22,18 +24,33 @@ add_library(dear_imgui STATIC
 target_include_directories(dear_imgui PUBLIC "extern/imgui")
 target_include_directories(dear_imgui PRIVATE "extern/glfw/include")
 
-add_library(glad STATIC "extern/glad/src/glad.c")
-target_include_directories(glad PUBLIC "extern/glad/include")
+# Optional implot
+if(GUI_BASE_INCLUDE_PLOTTING)
+    add_library(implot STATIC
+        "extern/implot/implot_demo.cpp"
+        "extern/implot/implot_internal.h"
+        "extern/implot/implot_items.cpp"
+        "extern/implot/implot.cpp"
+        "extern/implot/implot.h"
+    )
 
-add_subdirectory(extern/glfw)
+    target_include_directories(implot PUBLIC "extern/implot" "extern/imgui")
+endif()
 
+# Optional ImGuiFileDialog
 if(GUI_BASE_INCLUDE_FILE_DIALOG)
     add_subdirectory(extern/ImGuiFileDialog)
     target_include_directories(ImGuiFileDialog PRIVATE "extern/imgui")
 endif()
 
+# glad
+add_library(glad STATIC "extern/glad/src/glad.c")
+target_include_directories(glad PUBLIC "extern/glad/include")
+
+add_subdirectory(extern/glfw)
 add_subdirectory(gui_base)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 message(STATUS "gui_base: Including file dialog: ${GUI_BASE_INCLUDE_FILE_DIALOG}")
+message(STATUS "gui_base: Including plotting: ${GUI_BASE_INCLUDE_PLOTTING}")

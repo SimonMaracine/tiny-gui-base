@@ -16,3 +16,11 @@ and then to use CMake like so:
 add_subdirectory(<path_to_submodule>)
 target_link_libraries(<target> PRIVATE gui_base)
 ```
+
+[ImGuiFileDialog](https://github.com/aiekick/ImGuiFileDialog) and [implot](https://github.com/epezent/implot)
+are optional components controlled by these CMake variables:
+
+```cmake
+set(GUI_BASE_INCLUDE_FILE_DIALOG <ON|OFF>)
+set(GUI_BASE_INCLUDE_PLOTTING <ON|OFF>)
+```
