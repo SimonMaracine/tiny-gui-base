@@ -32,6 +32,10 @@ namespace gui_base {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
 
+    void GuiApplication::set_title(const char* title) {
+        glfwSetWindowTitle(window, title);
+    }
+
     void GuiApplication::loop() {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 

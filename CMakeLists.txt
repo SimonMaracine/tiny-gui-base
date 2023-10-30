@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
+set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Variable used to control the build type")
+
 option(GUI_BASE_INCLUDE_FILE_DIALOG "Whether to include ImGuiFileDialog or not" OFF)
 option(GUI_BASE_INCLUDE_PLOTTING "Whether to include implot or not" OFF)
 
@@ -23,6 +25,10 @@ add_library(dear_imgui STATIC
 
 target_include_directories(dear_imgui PUBLIC "extern/imgui")
 target_include_directories(dear_imgui PRIVATE "extern/glfw/include")
+
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    target_compile_definitions(dear_imgui PRIVATE "NDEBUG")
+endif()
 
 # Optional implot
 if(GUI_BASE_INCLUDE_PLOTTING)
