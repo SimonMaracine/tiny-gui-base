@@ -45,5 +45,5 @@ namespace gui_base {
 
     inline constexpr unsigned int VERSION_MAJOR {0};
     inline constexpr unsigned int VERSION_MINOR {5};
-    inline constexpr unsigned int VERSION_PATCH {0};
+    inline constexpr unsigned int VERSION_PATCH {1};
 }
