@@ -1,43 +1,49 @@
 #pragma once
 
+#include <stdexcept>
+
 // Include this for the user
 #include <imgui.h>
 
 struct GLFWwindow;
 
 namespace gui_base {
+    struct WindowProperties {
+        int width {1280};
+        int height {720};
+        const char* title {"tiny-gui-base"};
+        bool resizable {true};
+    };
+
     class GuiApplication {
     public:
-        GuiApplication() = default;
-        GuiApplication(int width, int height, const char* title, bool resizable = true);
-        virtual ~GuiApplication() = default;
+        explicit GuiApplication(const WindowProperties& window_properties);
+        virtual ~GuiApplication();
 
         int run();
     protected:
         virtual void start() = 0;
         virtual void update() = 0;
-        virtual void dispose() = 0;
+        virtual void stop() = 0;
 
-        void quit();
-        void set_title(const char* title);
+        void quit() const;
+        void set_title(const char* title) const;
 
-        int exit_code = 0;
-
-        struct {
-            int width = 1280;
-            int height = 720;
-            const char* title = "GUI Base";
-            bool resizable = true;
-        } window_properties;
+        int exit_code {};
     private:
         void loop();
-        void initialize();
-        void uninitialize();
+        void initialize(const WindowProperties& window_properties);
+        void uninitialize() const;
 
-        GLFWwindow* window = nullptr;
+        GLFWwindow* window {nullptr};
     };
 
-    inline constexpr unsigned int VERSION_MAJOR = 0;
-    inline constexpr unsigned int VERSION_MINOR = 4;
-    inline constexpr unsigned int VERSION_PATCH = 0;
+    struct InitializationError : public std::runtime_error {
+        explicit InitializationError(const char* message)
+            : std::runtime_error(message) {}
+    };
+
+    inline constexpr unsigned int VERSION_MAJOR {0};
+    inline constexpr unsigned int VERSION_MINOR {5};
+    inline constexpr unsigned int VERSION_PATCH {0};
 }

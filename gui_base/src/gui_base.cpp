@@ -1,4 +1,4 @@
-#include <cstdlib>
+#include "gui_base/gui_base.hpp"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -6,33 +6,28 @@
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_glfw.h>
 
-#include "gui_base/gui_base.hpp"
-
 namespace gui_base {
-    GuiApplication::GuiApplication(int width, int height, const char* title, bool resizable) {
-        window_properties.width = width;
-        window_properties.height = height;
-        window_properties.title = title;
-        window_properties.resizable = resizable;
+    GuiApplication::GuiApplication(const WindowProperties& window_properties) {
+        initialize(window_properties);
+    }
+
+    GuiApplication::~GuiApplication() {
+        uninitialize();
     }
 
     int GuiApplication::run() {
-        initialize();
         start();
-
         loop();
-
-        dispose();
-        uninitialize();
+        stop();
 
         return exit_code;
     }
 
-    void GuiApplication::quit() {
+    void GuiApplication::quit() const {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
 
-    void GuiApplication::set_title(const char* title) {
+    void GuiApplication::set_title(const char* title) const {
         glfwSetWindowTitle(window, title);
     }
 
@@ -62,9 +57,9 @@ namespace gui_base {
         }
     }
 
-    void GuiApplication::initialize() {
+    void GuiApplication::initialize(const WindowProperties& window_properties) {
         if (!glfwInit()) {
-            std::exit(1);
+            throw InitializationError("Could not initialize GLFW");
         }
 
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -84,14 +79,14 @@ namespace gui_base {
 
         if (window == nullptr) {
             glfwTerminate();
-            std::exit(1);
+            throw InitializationError("Could not create window");
         }
 
         glfwMakeContextCurrent(window);
 
         if (!gladLoadGL()) {
             glfwTerminate();
-            std::exit(1);
+            throw InitializationError("Could not initialize GLAD");
         }
 
         glfwSwapInterval(1);
@@ -104,7 +99,7 @@ namespace gui_base {
         ImGui_ImplOpenGL3_Init("#version 430 core");
     }
 
-    void GuiApplication::uninitialize() {
+    void GuiApplication::uninitialize() const {
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();

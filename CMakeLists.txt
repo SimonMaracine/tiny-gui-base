@@ -30,6 +30,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     target_compile_definitions(dear_imgui PRIVATE "NDEBUG")
 endif()
 
+# Optional ImGuiFileDialog
+if(GUI_BASE_INCLUDE_FILE_DIALOG)
+    add_subdirectory(extern/ImGuiFileDialog)
+    target_include_directories(ImGuiFileDialog PRIVATE "extern/imgui")
+endif()
+
 # Optional implot
 if(GUI_BASE_INCLUDE_PLOTTING)
     add_library(implot STATIC
@@ -39,14 +45,7 @@ if(GUI_BASE_INCLUDE_PLOTTING)
         "extern/implot/implot.cpp"
         "extern/implot/implot.h"
     )
-
     target_include_directories(implot PUBLIC "extern/implot" "extern/imgui")
-endif()
-
-# Optional ImGuiFileDialog
-if(GUI_BASE_INCLUDE_FILE_DIALOG)
-    add_subdirectory(extern/ImGuiFileDialog)
-    target_include_directories(ImGuiFileDialog PRIVATE "extern/imgui")
 endif()
 
 # glad
