@@ -7,7 +7,7 @@ I tested it on `GCC 13.2` and `MSVC 19.39`. It requires `C++17`.
 The easiest way to use this library is to include this repository as a submodule in your project with
 
 ```text
-git submodule add <repository_link> <repository_path>
+git submodule add -b stable -- <repository_link> <repository_path>
 ```
 
 and then to use CMake like so:
@@ -17,7 +17,7 @@ add_subdirectory(<path_to_submodule>)
 target_link_libraries(<target> PRIVATE gui_base)
 ```
 
-[ImGuiFileDialog](https://github.com/aiekick/ImGuiFileDialog) and [implot](https://github.com/epezent/implot)
+[ImGuiFileDialog](https://github.com/aiekick/ImGuiFileDialog) and [ImPlot](https://github.com/epezent/implot)
 are optional components controlled by these CMake variables:
 
 ```cmake
