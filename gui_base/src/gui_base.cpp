@@ -2,7 +2,6 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <imgui.h>
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_glfw.h>
 
@@ -81,6 +80,14 @@ namespace gui_base {
             glfwTerminate();
             throw InitializationError("Could not create window");
         }
+
+        glfwSetWindowSizeLimits(
+            window,
+            window_properties.min_width < 0 ? GLFW_DONT_CARE : window_properties.min_width,
+            window_properties.min_height < 0 ? GLFW_DONT_CARE : window_properties.min_height,
+            GLFW_DONT_CARE,
+            GLFW_DONT_CARE
+        );
 
         glfwMakeContextCurrent(window);
 

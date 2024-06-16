@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
 
+project("tiny-gui-base" LANGUAGES C CXX)
+
 set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Variable used to control the build type")
 
 option(GUI_BASE_INCLUDE_FILE_DIALOG "Whether to include ImGuiFileDialog or not" OFF)
 option(GUI_BASE_INCLUDE_PLOTTING "Whether to include implot or not" OFF)
-
-project("tiny-gui-base" LANGUAGES C CXX)
 
 # Dear ImGui
 add_library(dear_imgui STATIC

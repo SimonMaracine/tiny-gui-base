@@ -11,6 +11,8 @@ namespace gui_base {
     struct WindowProperties {
         int width {1280};
         int height {720};
+        int min_width {-1};
+        int min_height {-1};
         const char* title {"tiny-gui-base"};
         bool resizable {true};
     };
@@ -44,6 +46,6 @@ namespace gui_base {
     };
 
     inline constexpr unsigned int VERSION_MAJOR {0};
-    inline constexpr unsigned int VERSION_MINOR {5};
-    inline constexpr unsigned int VERSION_PATCH {1};
+    inline constexpr unsigned int VERSION_MINOR {6};
+    inline constexpr unsigned int VERSION_PATCH {0};
 }
