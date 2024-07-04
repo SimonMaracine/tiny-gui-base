@@ -9,18 +9,18 @@ option(GUI_BASE_INCLUDE_PLOTTING "Whether to include implot or not" OFF)
 
 # Dear ImGui
 add_library(dear_imgui STATIC
-    "extern/imgui/imgui.h"
-    "extern/imgui/imgui.cpp"
-    "extern/imgui/imgui_widgets.cpp"
-    "extern/imgui/imgui_tables.cpp"
-    "extern/imgui/imgui_draw.cpp"
     "extern/imgui/imgui_demo.cpp"
+    "extern/imgui/imgui_draw.cpp"
+    "extern/imgui/imgui_tables.cpp"
+    "extern/imgui/imgui_widgets.cpp"
+    "extern/imgui/imgui.cpp"
+    "extern/imgui/imgui.h"
     "extern/imgui/imgui_internal.h"
 
-    "extern/imgui/backends/imgui_impl_glfw.h"
     "extern/imgui/backends/imgui_impl_glfw.cpp"
-    "extern/imgui/backends/imgui_impl_opengl3.h"
     "extern/imgui/backends/imgui_impl_opengl3.cpp"
+    "extern/imgui/backends/imgui_impl_glfw.h"
+    "extern/imgui/backends/imgui_impl_opengl3.h"
 )
 
 target_include_directories(dear_imgui PUBLIC "extern/imgui")
