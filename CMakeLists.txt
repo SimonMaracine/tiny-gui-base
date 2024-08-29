@@ -6,6 +6,7 @@ set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Variable used to control the build ty
 
 option(GUI_BASE_INCLUDE_FILE_DIALOG "Whether to include ImGuiFileDialog or not" OFF)
 option(GUI_BASE_INCLUDE_PLOTTING "Whether to include implot or not" OFF)
+option(GUI_BASE_BUILD_TEST "Whether to build the test or not" OFF)
 
 include(cmake/dear_imgui.cmake)
 
@@ -22,7 +23,12 @@ include(cmake/glad.cmake)
 add_subdirectory(extern/glfw)
 add_subdirectory(gui_base)
 
+if(GUI_BASE_BUILD_TEST)
+    add_subdirectory(test)
+endif()
+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 message(STATUS "gui_base: Including file dialog: ${GUI_BASE_INCLUDE_FILE_DIALOG}")
 message(STATUS "gui_base: Including plotting: ${GUI_BASE_INCLUDE_PLOTTING}")
+message(STATUS "gui_base: Building test: ${GUI_BASE_BUILD_TEST}")

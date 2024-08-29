@@ -22,22 +22,27 @@ namespace gui_base {
         explicit GuiApplication(const WindowProperties& window_properties);
         virtual ~GuiApplication();
 
+        GuiApplication(const GuiApplication&) = delete;
+        GuiApplication& operator=(const GuiApplication&) = delete;
+        GuiApplication(GuiApplication&&) = delete;
+        GuiApplication& operator=(GuiApplication&&) = delete;
+
         int run();
     protected:
         virtual void start() = 0;
-        virtual void update() = 0;
         virtual void stop() = 0;
+        virtual void update() = 0;
 
         void quit() const;
         void set_title(const char* title) const;
 
-        int exit_code {};
+        int exit_code {0};
     private:
         void loop();
         void initialize(const WindowProperties& window_properties);
         void uninitialize() const;
 
-        GLFWwindow* window {nullptr};
+        GLFWwindow* m_window {nullptr};
     };
 
     struct InitializationError : public std::runtime_error {
@@ -46,6 +51,6 @@ namespace gui_base {
     };
 
     inline constexpr unsigned int VERSION_MAJOR {0};
-    inline constexpr unsigned int VERSION_MINOR {8};
-    inline constexpr unsigned int VERSION_PATCH {4};
+    inline constexpr unsigned int VERSION_MINOR {9};
+    inline constexpr unsigned int VERSION_PATCH {0};
 }

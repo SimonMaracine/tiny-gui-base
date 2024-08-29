@@ -23,17 +23,17 @@ namespace gui_base {
     }
 
     void GuiApplication::quit() const {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
+        glfwSetWindowShouldClose(m_window, GLFW_TRUE);
     }
 
     void GuiApplication::set_title(const char* title) const {
-        glfwSetWindowTitle(window, title);
+        glfwSetWindowTitle(m_window, title);
     }
 
     void GuiApplication::loop() {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-        while (!glfwWindowShouldClose(window)) {
+        while (!glfwWindowShouldClose(m_window)) {
             glfwPollEvents();
 
             ImGui_ImplOpenGL3_NewFrame();
@@ -45,14 +45,14 @@ namespace gui_base {
             ImGui::Render();
 
             int display_w {}, display_h {};
-            glfwGetFramebufferSize(window, &display_w, &display_h);
+            glfwGetFramebufferSize(m_window, &display_w, &display_h);
 
             glViewport(0, 0, display_w, display_h);
             glClear(GL_COLOR_BUFFER_BIT);
 
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-            glfwSwapBuffers(window);
+            glfwSwapBuffers(m_window);
         }
     }
 
@@ -68,7 +68,7 @@ namespace gui_base {
         glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
         glfwWindowHint(GLFW_RESIZABLE, window_properties.resizable ? GLFW_TRUE : GLFW_FALSE);
 
-        window = glfwCreateWindow(
+        m_window = glfwCreateWindow(
             window_properties.width,
             window_properties.height,
             window_properties.title,
@@ -76,20 +76,20 @@ namespace gui_base {
             nullptr
         );
 
-        if (window == nullptr) {
+        if (m_window == nullptr) {
             glfwTerminate();
             throw InitializationError("Could not create window");
         }
 
         glfwSetWindowSizeLimits(
-            window,
+            m_window,
             window_properties.min_width < 0 ? GLFW_DONT_CARE : window_properties.min_width,
             window_properties.min_height < 0 ? GLFW_DONT_CARE : window_properties.min_height,
             GLFW_DONT_CARE,
             GLFW_DONT_CARE
         );
 
-        glfwMakeContextCurrent(window);
+        glfwMakeContextCurrent(m_window);
 
         if (!gladLoadGL()) {
             glfwTerminate();
@@ -102,7 +102,7 @@ namespace gui_base {
         ImGui::CreateContext();
         ImGui::StyleColorsDark();
 
-        ImGui_ImplGlfw_InitForOpenGL(window, true);
+        ImGui_ImplGlfw_InitForOpenGL(m_window, true);
         ImGui_ImplOpenGL3_Init("#version 430 core");
     }
 
@@ -111,7 +111,7 @@ namespace gui_base {
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
 
-        glfwDestroyWindow(window);
+        glfwDestroyWindow(m_window);
         glfwTerminate();
     }
 }

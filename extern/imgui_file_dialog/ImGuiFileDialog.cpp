@@ -990,9 +990,7 @@ std::string IGFD::Utils::FormatFileSize(size_t vByteSize) {
         static double lo = 1024.0;
         static double ko = 1024.0 * 1024.0;
         static double mo = 1024.0 * 1024.0 * 1024.0;
-
-        auto v = (double)vByteSize;
-
+        const auto v = static_cast<double>(vByteSize);
         if (v < lo)
             return RoundNumber(v, 0) + " " + fileSizeBytes;  // octet
         else if (v < ko)
@@ -1005,6 +1003,91 @@ std::string IGFD::Utils::FormatFileSize(size_t vByteSize) {
 
     return "0 " fileSizeBytes;
 }
+
+// https://cplusplus.com/reference/cstdlib/strtod
+bool IGFD::Utils::M_IsAValidCharExt(const char& c) {
+    return c == '.' ||            // .5
+           c == '-' || c == '+';  // -2.5 or +2.5;
+}
+
+// https://cplusplus.com/reference/cstdlib/strtod
+bool IGFD::Utils::M_IsAValidCharSuffix(const char& c) {
+    return c == 'e' || c == 'E' ||  // 1e5 or 1E5
+           c == 'x' || c == 'X' ||  // 0x14 or 0X14
+           c == 'p' || c == 'P';    // 6.2p2 or 3.2P-5
+}
+
+bool IGFD::Utils::M_ExtractNumFromStringAtPos(const std::string& str, size_t& pos, double& vOutNum) {
+    if (!str.empty() && pos < str.size()) {
+        const char fc = str.at(pos);  // first char
+        // if the first char is not possible for a number we quit
+        if (std::isdigit(fc) || M_IsAValidCharExt(fc)) {
+            static constexpr size_t COUNT_CHAR = 64;
+            char buf[COUNT_CHAR + 1];
+            size_t buf_p        = 0;
+            bool is_last_digit  = false;
+            bool is_last_suffix = false;
+            const auto& ss      = str.size();
+            while (ss > 1 && pos < ss && buf_p < COUNT_CHAR) {
+                const char& c = str.at(pos);
+                // a suffix must be after a number
+                if (is_last_digit && M_IsAValidCharSuffix(c)) {
+                    is_last_suffix = true;
+                    buf[buf_p++]   = c;
+                } else if (std::isdigit(c)) {
+                    is_last_suffix = false;
+                    is_last_digit  = true;
+                    buf[buf_p++]   = c;
+                } else if (M_IsAValidCharExt(c)) {
+                    is_last_digit = false;
+                    buf[buf_p++]  = c;
+                } else {
+                    break;
+                }
+                ++pos;
+            }
+            // if the last char is a suffix so its not a number
+            if (buf_p != 0 && !is_last_suffix) {
+                buf[buf_p] = '\0';
+                char* endPtr;
+                vOutNum = strtod(buf, &endPtr);
+                // the edge cases for numbers will be next filtered by strtod
+                if (endPtr != buf) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+// Fonction de comparaison naturelle entre deux cha�nes
+bool IGFD::Utils::NaturalCompare(const std::string& vA, const std::string& vB, bool vInsensitiveCase, bool vDescending) {
+    std::size_t ia = 0, ib = 0;
+    double nA, nB;
+    const auto& as = vA.size();
+    const auto& bs = vB.size();
+    while (ia < as && ib < bs) {
+        const char& ca = vInsensitiveCase ? std::tolower(vA[ia]) : vA[ia];
+        const char& cb = vInsensitiveCase ? std::tolower(vB[ib]) : vB[ib];
+        // we cannot start a number extraction from suffixs
+        const auto rA = M_ExtractNumFromStringAtPos(vA, ia, nA);
+        const auto rB = M_ExtractNumFromStringAtPos(vB, ib, nB);
+        if (rA && rB) {
+            if (nA != nB) {
+                return vDescending ? nA > nB : nA < nB;
+            }
+        } else {
+            if (ca != cb) {
+                return vDescending ? ca > cb : ca < cb;
+            }
+            ++ia;
+            ++ib;
+        }
+    }
+    return vDescending ? as > bs : as < bs;  // toto1 < toto1+
+}
+
 
 IGFD::FileStyle::FileStyle() : color(0, 0, 0, 0) {
 }
@@ -1722,6 +1805,18 @@ void IGFD::FileManager::SortFields(const FileDialogInternal& vFileDialogInternal
     m_SortFields(vFileDialogInternal, m_FileList, m_FilteredFileList);
 }
 
+bool IGFD::FileManager::M_SortStrings(const FileDialogInternal& vFileDialogInternal, const bool vInsensitiveCase, const bool vDescendingOrder, const std::string& vA, const std::string& vB) {
+    if (vFileDialogInternal.getDialogConfig().flags & ImGuiFileDialogFlags_NaturalSorting) {
+        return IGFD::Utils::NaturalCompare(vA, vB, vInsensitiveCase, vDescendingOrder);
+    } else if (vInsensitiveCase) {
+        const auto ret = stricmp(vA.c_str(), vB.c_str());
+        return vDescendingOrder ? (ret > 0) : (ret < 0);
+    } else {
+        const auto ret = strcmp(vA.c_str(), vB.c_str());
+        return vDescendingOrder ? (ret > 0) : (ret < 0);
+    }
+}
+
 void IGFD::FileManager::m_SortFields(const FileDialogInternal& vFileDialogInternal, std::vector<std::shared_ptr<FileInfos> >& vFileInfosList, std::vector<std::shared_ptr<FileInfos> >& vFileInfosFilteredList) {
     if (sortingField != SortingFieldEnum::FIELD_NONE) {
         headerFileName = tableHeaderFileNameString;
@@ -1737,71 +1832,41 @@ void IGFD::FileManager::m_SortFields(const FileDialogInternal& vFileDialogIntern
 #ifdef USE_CUSTOM_SORTING_ICON
             headerFileName = tableHeaderAscendingIcon + headerFileName;
 #endif  // USE_CUSTOM_SORTING_ICON
-            std::sort(vFileInfosList.begin(), vFileInfosList.end(), [](const std::shared_ptr<FileInfos>& a, const std::shared_ptr<FileInfos>& b) -> bool {
-                if (!a.use_count() || !b.use_count()) return false;
-                // tofix : this code fail in c:\\Users with the link "All users". got a invalid comparator
-                /*
-                // use code from
-                https://github.com/jackm97/ImGuiFileDialog/commit/bf40515f5a1de3043e60562dc1a494ee7ecd3571
-                // strict ordering for file/directory types beginning in '.'
-                // common on _IGFD_WIN_ platforms
-                if (a->fileNameExt[0] == '.' && b->fileNameExt[0] != '.')
-                    return false;
-                if (a->fileNameExt[0] != '.' && b->fileNameExt[0] == '.')
-                    return true;
-                if (a->fileNameExt[0] == '.' && b->fileNameExt[0] == '.')
-                {
-                    return (stricmp(a->fileNameExt.c_str(), b->fileNameExt.c_str()) < 0); // sort in insensitive
-                case
-                }
-                */
-                if (a->fileType != b->fileType) return (a->fileType < b->fileType);    // directories first
-                return (stricmp(a->fileNameExt.c_str(), b->fileNameExt.c_str()) < 0);  // sort in insensitive case
-            });
+            std::sort(vFileInfosList.begin(), vFileInfosList.end(), //
+                      [&vFileDialogInternal](const std::shared_ptr<FileInfos>& a, const std::shared_ptr<FileInfos>& b) -> bool {
+                          if (!a.use_count() || !b.use_count()) return false;
+                          if (a->fileType != b->fileType) return (a->fileType < b->fileType);                      // directories first
+                          return M_SortStrings(vFileDialogInternal, true, false, a->fileNameExt, b->fileNameExt);  // sort in insensitive case
+                      });
         } else {
 #ifdef USE_CUSTOM_SORTING_ICON
             headerFileName = tableHeaderDescendingIcon + headerFileName;
-#endif  // USE_CUSTOM_SORTING_ICON
-            std::sort(vFileInfosList.begin(), vFileInfosList.end(), [](const std::shared_ptr<FileInfos>& a, const std::shared_ptr<FileInfos>& b) -> bool {
-                if (!a.use_count() || !b.use_count()) return false;
-                // tofix : this code fail in c:\\Users with the link "All users". got a invalid comparator
-                /*
-                // use code from
-                https://github.com/jackm97/ImGuiFileDialog/commit/bf40515f5a1de3043e60562dc1a494ee7ecd3571
-                // strict ordering for file/directory types beginning in '.'
-                // common on _IGFD_WIN_ platforms
-                if (a->fileNameExt[0] == '.' && b->fileNameExt[0] != '.')
-                    return false;
-                if (a->fileNameExt[0] != '.' && b->fileNameExt[0] == '.')
-                    return true;
-                if (a->fileNameExt[0] == '.' && b->fileNameExt[0] == '.')
-                {
-                    return (stricmp(a->fileNameExt.c_str(), b->fileNameExt.c_str()) > 0); // sort in insensitive
-                case
-                }
-                */
-                if (a->fileType != b->fileType) return (a->fileType > b->fileType);    // directories last
-                return (stricmp(a->fileNameExt.c_str(), b->fileNameExt.c_str()) > 0);  // sort in insensitive case
-            });
+#endif // USE_CUSTOM_SORTING_ICON
+            std::sort(vFileInfosList.begin(), vFileInfosList.end(),  //
+                      [&vFileDialogInternal](const std::shared_ptr<FileInfos>& a, const std::shared_ptr<FileInfos>& b) -> bool {
+                          if (!a.use_count() || !b.use_count()) return false;
+                          if (a->fileType != b->fileType) return (a->fileType > b->fileType);                     // directories last
+                          return M_SortStrings(vFileDialogInternal, true, true, a->fileNameExt, b->fileNameExt);  // sort in insensitive case
+                      });
         }
     } else if (sortingField == SortingFieldEnum::FIELD_TYPE) {
         if (sortingDirection[1]) {
 #ifdef USE_CUSTOM_SORTING_ICON
             headerFileType = tableHeaderAscendingIcon + headerFileType;
 #endif  // USE_CUSTOM_SORTING_ICON
-            std::sort(vFileInfosList.begin(), vFileInfosList.end(), [](const std::shared_ptr<FileInfos>& a, const std::shared_ptr<FileInfos>& b) -> bool {
+            std::sort(vFileInfosList.begin(), vFileInfosList.end(), [&vFileDialogInternal](const std::shared_ptr<FileInfos>& a, const std::shared_ptr<FileInfos>& b) -> bool {
                 if (!a.use_count() || !b.use_count()) return false;
                 if (a->fileType != b->fileType) return (a->fileType < b->fileType);  // directory in first
-                return (a->fileExtLevels[0] < b->fileExtLevels[0]);                  // else
+                return M_SortStrings(vFileDialogInternal, true, false, a->fileExtLevels[0], b->fileExtLevels[0]);  // sort in sensitive case
             });
         } else {
 #ifdef USE_CUSTOM_SORTING_ICON
             headerFileType = tableHeaderDescendingIcon + headerFileType;
 #endif  // USE_CUSTOM_SORTING_ICON
-            std::sort(vFileInfosList.begin(), vFileInfosList.end(), [](const std::shared_ptr<FileInfos>& a, const std::shared_ptr<FileInfos>& b) -> bool {
+            std::sort(vFileInfosList.begin(), vFileInfosList.end(), [&vFileDialogInternal](const std::shared_ptr<FileInfos>& a, const std::shared_ptr<FileInfos>& b) -> bool {
                 if (!a.use_count() || !b.use_count()) return false;
                 if (a->fileType != b->fileType) return (a->fileType > b->fileType);  // directory in last
-                return (a->fileExtLevels[0] > b->fileExtLevels[0]);                  // else
+                return M_SortStrings(vFileDialogInternal, true, true, a->fileExtLevels[0], b->fileExtLevels[0]);  // sort in sensitive case
             });
         }
     } else if (sortingField == SortingFieldEnum::FIELD_SIZE) {
@@ -1906,8 +1971,8 @@ void IGFD::FileManager::ClearPathLists() {
 void IGFD::FileManager::m_AddFile(const FileDialogInternal& vFileDialogInternal, const std::string& vPath, const std::string& vFileName, const FileType& vFileType) {
     auto infos_ptr = FileInfos::create();
 
-    infos_ptr->filePath          = vPath;
-    infos_ptr->fileNameExt       = vFileName;
+    infos_ptr->filePath              = vPath;
+    infos_ptr->fileNameExt           = vFileName;
     infos_ptr->fileNameExt_optimized = Utils::LowerCaseString(infos_ptr->fileNameExt);
     infos_ptr->fileType              = vFileType;
 
@@ -1916,13 +1981,14 @@ void IGFD::FileManager::m_AddFile(const FileDialogInternal& vFileDialogInternal,
     }
 
     if (infos_ptr->fileNameExt != ".." && (vFileDialogInternal.getDialogConfig().flags & ImGuiFileDialogFlags_DontShowHiddenFiles) && infos_ptr->fileNameExt[0] == '.') {  // dont show hidden files
-        if (!vFileDialogInternal.filterManager.dLGFilters.empty() || (vFileDialogInternal.filterManager.dLGFilters.empty() && infos_ptr->fileNameExt != ".")) {  // except "." if in directory mode //-V728
+        if (!vFileDialogInternal.filterManager.dLGFilters.empty() || (vFileDialogInternal.filterManager.dLGFilters.empty() && infos_ptr->fileNameExt != ".")) {            // except "." if in directory mode //-V728
             return;
         }
     }
 
     if (infos_ptr->FinalizeFileTypeParsing(vFileDialogInternal.filterManager.GetSelectedFilter().count_dots)) {
-        if (!vFileDialogInternal.filterManager.IsCoveredByFilters(*infos_ptr.get(), (vFileDialogInternal.getDialogConfig().flags & ImGuiFileDialogFlags_CaseInsensitiveExtention) != 0)) {
+        if (!vFileDialogInternal.filterManager.IsCoveredByFilters(*infos_ptr.get(),  //
+                                                                  (vFileDialogInternal.getDialogConfig().flags & ImGuiFileDialogFlags_CaseInsensitiveExtentionFiltering) != 0)) {
             return;
         }
     }
@@ -2610,10 +2676,12 @@ std::string IGFD::FileManager::GetResultingFileName(FileDialogInternal& vFileDia
 std::string IGFD::FileManager::GetResultingFilePathName(FileDialogInternal& vFileDialogInternal, IGFD_ResultMode vFlag) {
     if (!dLGDirectoryMode) {  // if not directory mode
         auto result          = GetResultingPath();
-        const auto& filename = GetResultingFileName(vFileDialogInternal, vFlag);
-        if (!filename.empty()) {
-            if (m_FileSystemPtr != nullptr && m_FileSystemPtr->IsFileExist(filename)) {
-                result = filename; // #144, exist file, so absolute, so return it (maybe set by user in inputText)
+        const auto& file_path_name = GetResultingFileName(vFileDialogInternal, vFlag);
+        if (!file_path_name.empty()) {
+            if (m_FileSystemPtr != nullptr && 
+                file_path_name.find(IGFD::Utils::GetPathSeparator()) != std::string::npos &&  // check if a path
+                m_FileSystemPtr->IsFileExist(file_path_name)) { // do that only if filename is a path, not only a file name 
+                result = file_path_name; // #144, exist file, so absolute, so return it (maybe set by user in inputText)
             } else { // #144, else concate path with current filename
 #ifdef _IGFD_UNIX_
                 if (fsRoot != result)
@@ -2621,13 +2689,13 @@ std::string IGFD::FileManager::GetResultingFilePathName(FileDialogInternal& vFil
                 {
                     result += IGFD::Utils::GetPathSeparator();
                 }
-                result += filename;
+                result += file_path_name;
             }
         }
 
-        return result;
+        return result;  // file mode
     }
-    return "";  // file mode
+    return "";  // directory mode
 }
 
 std::map<std::string, std::string> IGFD::FileManager::GetResultingSelection(FileDialogInternal& vFileDialogInternal, IGFD_ResultMode vFlag) {
@@ -3431,6 +3499,7 @@ void IGFD::KeyExplorerFeature::m_ExploreWithkeys(FileDialogInternal& vFileDialog
     }
 }
 
+
 bool IGFD::KeyExplorerFeature::m_FlashableSelectable(const char* label, bool selected, ImGuiSelectableFlags flags, bool vFlashing, const ImVec2& size_arg) {
     using namespace ImGui;
 
@@ -3442,7 +3511,7 @@ bool IGFD::KeyExplorerFeature::m_FlashableSelectable(const char* label, bool sel
 
     // Submit label or explicit size to ItemSize(), whereas ItemAdd() will submit a larger/spanning rectangle.
     ImGuiID id        = window->GetID(label);
-    ImVec2 label_size = CalcTextSize(label, nullptr, true);
+    ImVec2 label_size = CalcTextSize(label, NULL, true);
     ImVec2 size(size_arg.x != 0.0f ? size_arg.x : label_size.x, size_arg.y != 0.0f ? size_arg.y : label_size.y);
     ImVec2 pos = window->DC.CursorPos;
     pos.y += window->DC.CurrLineTextBaseOffset;
@@ -3460,6 +3529,7 @@ bool IGFD::KeyExplorerFeature::m_FlashableSelectable(const char* label, bool sel
     const ImVec2 text_max(min_x + size.x, pos.y + size.y);
 
     // Selectables are meant to be tightly packed together with no click-gap, so we extend their box to cover spacing between selectable.
+    // FIXME: Not part of layout so not included in clipper calculation, but ItemSize currenty doesn't allow offsetting CursorPos.
     ImRect bb(min_x, pos.y, text_max.x, text_max.y);
     if ((flags & ImGuiSelectableFlags_NoPadWithHalfSpacing) == 0) {
         const float spacing_x = span_all_columns ? 0.0f : style.ItemSpacing.x;
@@ -3482,13 +3552,17 @@ bool IGFD::KeyExplorerFeature::m_FlashableSelectable(const char* label, bool sel
     }
 
     const bool disabled_item = (flags & ImGuiSelectableFlags_Disabled) != 0;
-    const bool item_add      = ItemAdd(bb, id, nullptr, disabled_item ? ImGuiItemFlags_Disabled : ImGuiItemFlags_None);
+    const bool is_visible    = ItemAdd(bb, id, NULL, disabled_item ? (ImGuiItemFlags)ImGuiItemFlags_Disabled : ImGuiItemFlags_None);
+
     if (span_all_columns) {
         window->ClipRect.Min.x = backup_clip_rect_min_x;
         window->ClipRect.Max.x = backup_clip_rect_max_x;
     }
 
-    if (!item_add) return false;
+    const bool is_multi_select = (g.LastItemData.InFlags & ImGuiItemFlags_IsMultiSelect) != 0;
+    if (!is_visible)
+        if (!is_multi_select || !g.BoxSelectState.UnclipMode || !g.BoxSelectState.UnclipRect.Overlaps(bb))  // Extra layer of "no logic clip" for box-select support (would be more overhead to add to ItemAdd)
+            return false;
 
     const bool disabled_global = (g.CurrentItemFlags & ImGuiItemFlags_Disabled) != 0;
     if (disabled_item && !disabled_global)  // Only testing this as an optimization
@@ -3526,19 +3600,35 @@ bool IGFD::KeyExplorerFeature::m_FlashableSelectable(const char* label, bool sel
         button_flags |= ImGuiButtonFlags_AllowOverlap;
     }
 
+    // Multi-selection support (header)
     const bool was_selected = selected;
+    if (is_multi_select) {
+        // Handle multi-select + alter button flags for it
+        MultiSelectItemHeader(id, &selected, &button_flags);
+    }
+
     bool hovered, held;
     bool pressed = ButtonBehavior(bb, id, &hovered, &held, button_flags);
 
-    // Auto-select when moved into
-    // - This will be more fully fleshed in the range-select branch
-    // - This is not exposed as it won't nicely work with some user side handling of shift/control
-    // - We cannot do 'if (g.NavJustMovedToId != id) { selected = false; pressed = was_selected; }' for two reasons
-    //   - (1) it would require focus scope to be set, need exposing PushFocusScope() or equivalent (e.g. BeginSelection() calling PushFocusScope())
-    //   - (2) usage will fail with clipped items
-    //   The multi-select API aim to fix those issues, e.g. may be replaced with a BeginSelection() API.
-    if ((flags & ImGuiSelectableFlags_SelectOnNav) && g.NavJustMovedToId != 0 && g.NavJustMovedToFocusScopeId == g.CurrentFocusScopeId)
-        if (g.NavJustMovedToId == id) selected = pressed = true;
+    // Multi-selection support (footer)
+    if (is_multi_select) {
+        MultiSelectItemFooter(id, &selected, &pressed);
+    } else {
+        // Auto-select when moved into
+        // - This will be more fully fleshed in the range-select branch
+        // - This is not exposed as it won't nicely work with some user side handling of shift/control
+        // - We cannot do 'if (g.NavJustMovedToId != id) { selected = false; pressed = was_selected; }' for two reasons
+        //   - (1) it would require focus scope to be set, need exposing PushFocusScope() or equivalent (e.g. BeginSelection() calling PushFocusScope())
+        //   - (2) usage will fail with clipped items
+        //   The multi-select API aim to fix those issues, e.g. may be replaced with a BeginSelection() API.
+        if ((flags & ImGuiSelectableFlags_SelectOnNav) && g.NavJustMovedToId != 0 && g.NavJustMovedToFocusScopeId == g.CurrentFocusScopeId)
+            if (g.NavJustMovedToId == id) selected = pressed = true;
+    }
+
+    //////////////////////////////////////////////////////////////////
+    // this function copy ImGui::Selectable just for this line....
+    hovered |= vFlashing;
+    //////////////////////////////////////////////////////////////////
 
     // Update NavId when clicking or when Hovering (this doesn't happen on most widgets), so navigation can be resumed with gamepad/keyboard
     if (pressed || (hovered && (flags & ImGuiSelectableFlags_SetNavIdOnHover))) {
@@ -3549,21 +3639,25 @@ bool IGFD::KeyExplorerFeature::m_FlashableSelectable(const char* label, bool sel
     }
     if (pressed) MarkItemEdited(id);
 
-    // In this branch, Selectable() cannot toggle the selection so this will never trigger.
-    if (selected != was_selected)  //-V547
-        g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_ToggledSelection;
-
-    //////////////////////////////////////////////////////////////////
-    // this function copy ImGui::Selectable just for this line....
-    hovered |= vFlashing;
-    //////////////////////////////////////////////////////////////////
+    if (selected != was_selected) g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_ToggledSelection;
 
     // Render
-    if (hovered || selected) {
-        const ImU32 col = GetColorU32((held && hovered) ? ImGuiCol_HeaderActive : hovered ? ImGuiCol_HeaderHovered : ImGuiCol_Header);
-        RenderFrame(bb.Min, bb.Max, col, false, 0.0f);
+    if (is_visible) {
+        if (hovered || selected) {
+            // FIXME-MULTISELECT: Styling: Color for 'selected' elements? ImGuiCol_HeaderSelected
+            ImU32 col;
+            if (selected && !hovered)
+                col = GetColorU32(ImLerp(GetStyleColorVec4(ImGuiCol_Header), GetStyleColorVec4(ImGuiCol_HeaderHovered), 0.5f));
+            else
+                col = GetColorU32((held && hovered) ? ImGuiCol_HeaderActive : hovered ? ImGuiCol_HeaderHovered : ImGuiCol_Header);
+            RenderFrame(bb.Min, bb.Max, col, false, 0.0f);
+        }
+        if (g.NavId == id) {
+            ImGuiNavHighlightFlags nav_highlight_flags = ImGuiNavHighlightFlags_Compact | ImGuiNavHighlightFlags_NoRounding;
+            if (is_multi_select) nav_highlight_flags |= ImGuiNavHighlightFlags_AlwaysDraw;  // Always show the nav rectangle
+            RenderNavHighlight(bb, id, nav_highlight_flags);
+        }
     }
-    if (g.NavId == id) RenderNavHighlight(bb, id, ImGuiNavHighlightFlags_Compact | ImGuiNavHighlightFlags_NoRounding);
 
     if (span_all_columns) {
         if (g.CurrentTable)
@@ -3572,13 +3666,16 @@ bool IGFD::KeyExplorerFeature::m_FlashableSelectable(const char* label, bool sel
             PopColumnsBackground();
     }
 
-    RenderTextClipped(text_min, text_max, label, nullptr, &label_size, style.SelectableTextAlign, &bb);
+    if (is_visible) RenderTextClipped(text_min, text_max, label, NULL, &label_size, style.SelectableTextAlign, &bb);
 
     // Automatically close popups
-    if (pressed && (window->Flags & ImGuiWindowFlags_Popup) && !(flags & ImGuiSelectableFlags_DontClosePopups) && !(g.LastItemData.InFlags & ImGuiItemFlags_SelectableDontClosePopup)) CloseCurrentPopup();
+    if (pressed && (window->Flags & ImGuiWindowFlags_Popup) && !(flags & ImGuiSelectableFlags_NoAutoClosePopups) && (g.LastItemData.InFlags & ImGuiItemFlags_AutoClosePopups)) CloseCurrentPopup();
 
     if (disabled_item && !disabled_global) EndDisabled();
 
+    // Selectable() always returns a pressed state!
+    // Users of BeginMultiSelect()/EndMultiSelect() scope: you may call ImGui::IsItemToggledSelection() to retrieve
+    // selection toggle, only useful if you need that state updated (e.g. for rendering purpose) before reaching EndMultiSelect().
     IMGUI_TEST_ENGINE_ITEM_INFO(id, label, g.LastItemData.StatusFlags);
     return pressed;  //-V1020
 }
@@ -3644,20 +3741,19 @@ bool IGFD::FileDialog::Display(const std::string& vKey, ImGuiWindowFlags vFlags,
         auto& fdFile   = m_FileDialogInternal.fileManager;
         auto& fdFilter = m_FileDialogInternal.filterManager;
 
-        static ImGuiWindowFlags flags;  // todo: not a good solution for multi instance, to fix
-
         // to be sure than only one dialog is displayed per frame
         ImGuiContext& g = *GImGui;
-        if (g.FrameCount == m_FileDialogInternal.lastImGuiFrameCount)  // one instance was displayed this frame before
-                                                                       // for this key +> quit
-            return res;
+        if (g.FrameCount == m_FileDialogInternal.lastImGuiFrameCount) {  // one instance was displayed this frame before
+            return res;                                                  // for this key +> quit
+        }
         m_FileDialogInternal.lastImGuiFrameCount = g.FrameCount;  // mark this instance as used this frame
 
+        m_CurrentDisplayedFlags = ImGuiWindowFlags_None;
         std::string name = m_FileDialogInternal.dLGtitle + "##" + m_FileDialogInternal.dLGkey;
         if (m_FileDialogInternal.name != name) {
             fdFile.ClearComposer();
             fdFile.ClearFileLists();
-            flags = vFlags;
+            m_CurrentDisplayedFlags = vFlags;
         }
 
         m_NewFrame();
@@ -3671,44 +3767,41 @@ bool IGFD::FileDialog::Display(const std::string& vKey, ImGuiWindowFlags vFlags,
         }
 #endif  // IMGUI_HAS_VIEWPORT
 
-        bool beg = false;
-        if (m_FileDialogInternal.getDialogConfig().flags & ImGuiFileDialogFlags_NoDialog)  // disable our own dialog system (standard or modal)
-        {
+        bool beg         = false;
+        ImVec2 frameSize = ImVec2(0, 0);
+        if (m_FileDialogInternal.getDialogConfig().flags & ImGuiFileDialogFlags_NoDialog) {  // disable our own dialog system (standard or modal)
+            frameSize = vMinSize;
             beg = true;
         } else {
             ImGui::SetNextWindowSizeConstraints(vMinSize, vMaxSize);
-
-            if (m_FileDialogInternal.getDialogConfig().flags & ImGuiFileDialogFlags_Modal && !m_FileDialogInternal.okResultToConfirm)  // disable modal because the confirm dialog for overwrite is
-                                                                                                                        // a new modal
-            {
+            if (m_FileDialogInternal.getDialogConfig().flags & ImGuiFileDialogFlags_Modal &&  // disable modal because the confirm dialog for overwrite is
+                !m_FileDialogInternal.okResultToConfirm) {                                    // a new modal
                 ImGui::OpenPopup(name.c_str());
-                beg = ImGui::BeginPopupModal(name.c_str(), (bool*)nullptr, flags | ImGuiWindowFlags_NoScrollbar);
+                beg = ImGui::BeginPopupModal(name.c_str(), (bool*)nullptr, m_CurrentDisplayedFlags | ImGuiWindowFlags_NoScrollbar);
             } else {
-                beg = ImGui::Begin(name.c_str(), (bool*)nullptr, flags | ImGuiWindowFlags_NoScrollbar);
+                beg = ImGui::Begin(name.c_str(), (bool*)nullptr, m_CurrentDisplayedFlags | ImGuiWindowFlags_NoScrollbar);
             }
         }
         if (beg) {
 #ifdef IMGUI_HAS_VIEWPORT
             // if decoration is enabled we disable the resizing feature of imgui for avoid crash with SDL2 and GLFW3
             if (ImGui::GetIO().ConfigViewportsNoDecoration) {
-                flags = vFlags;
+                m_CurrentDisplayedFlags = vFlags;
             } else {
                 auto win = ImGui::GetCurrentWindowRead();
                 if (win->Viewport->Idx != 0)
-                    flags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar;
+                    m_CurrentDisplayedFlags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar;
                 else
-                    flags = vFlags;
+                    m_CurrentDisplayedFlags = vFlags;
             }
 #endif  // IMGUI_HAS_VIEWPORT
 
             ImGuiID _frameId = ImGui::GetID(name.c_str());
-            ImVec2 frameSize = ImVec2(0, 0);
-            if (m_FileDialogInternal.getDialogConfig().flags & ImGuiFileDialogFlags_NoDialog) frameSize = vMaxSize;
-            if (ImGui::BeginChild(_frameId, frameSize, false, flags | ImGuiWindowFlags_NoScrollbar)) {
+            if (ImGui::BeginChild(_frameId, frameSize, false, m_CurrentDisplayedFlags | ImGuiWindowFlags_NoScrollbar)) {
                 m_FileDialogInternal.name = name;  //-V820
-
-                if (fdFile.dLGpath.empty()) fdFile.dLGpath = ".";  // defaut path is '.'
-
+                if (fdFile.dLGpath.empty()) {
+                    fdFile.dLGpath = ".";  // defaut path is '.'
+                }
                 fdFilter.SetDefaultFilterIfNotDefined();
 
                 // init list of files
@@ -4024,10 +4117,11 @@ void IGFD::FileDialog::m_SelectableItem(int vidx, std::shared_ptr<FileInfos> vIn
 #ifdef USE_EXPLORATION_BY_KEYS
     bool flashed = m_BeginFlashItem((size_t)vidx);
     bool res = m_FlashableSelectable(fdi.variadicBuffer, vSelected, selectableFlags, flashed, ImVec2(-1.0f, h));
-    if (flashed)
+    if (flashed) {
         m_EndFlashItem();
+    }
 #else   // USE_EXPLORATION_BY_KEYS
-    (void)vidx;  // remove a warnings ofr unused var
+    (void)vidx;  // remove a warnings for unused var
 
     bool res = ImGui::Selectable(fdi.variadicBuffer, vSelected, selectableFlags, ImVec2(-1.0f, h));
 #endif  // USE_EXPLORATION_BY_KEYS
